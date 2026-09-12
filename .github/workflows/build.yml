@@ -80,7 +80,6 @@ jobs:
             ghcr.io/kkkkeybird/cliproxyapi-cgo:latest
             ghcr.io/kkkkeybird/cliproxyapi-cgo:${{ steps.versions.outputs.upstream_version }}
           build-args: |
-            UPSTREAM_IMAGE=${{ steps.versions.outputs.upstream_digest }}
             VERSION=${{ steps.versions.outputs.upstream_version }}-cgo
             COMMIT=${{ steps.versions.outputs.upstream_revision }}
             BUILD_DATE=${{ steps.versions.outputs.build_date }}

@@ -1,13 +1,13 @@
-ARG UPSTREAM_IMAGE=ghcr.io/caidaoli/cliproxyapi:latest
-
-FROM golang:1.26-alpine AS builder
+FROM golang:1.26-bookworm AS builder
 
 ARG VERSION=latest-cgo
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
 ARG PLUGIN_VERSION=dev
 
-RUN apk add --no-cache build-base git
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential git && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 
@@ -45,9 +45,24 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     -ldflags="-s -w -X main.pluginVersion=${PLUGIN_VERSION}" \
     -o /out/codex-auto-ping.so .
 
-FROM ${UPSTREAM_IMAGE}
+FROM debian:bookworm
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates tzdata && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /CLIProxyAPI/plugins/linux/amd64
 
 COPY --from=builder /out/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
 COPY --from=builder /out/codex-auto-ping.so /CLIProxyAPI/plugins/linux/amd64/codex-auto-ping.so
+COPY upstream/config.example.yaml /CLIProxyAPI/config.example.yaml
+
+WORKDIR /CLIProxyAPI
+
+EXPOSE 8317
+
+ENV TZ=Asia/Shanghai
+
+RUN cp /usr/share/zoneinfo/${TZ} /etc/localtime && echo "${TZ}" > /etc/timezone
+
+CMD ["./CLIProxyAPI"]
