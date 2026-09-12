@@ -1,13 +1,10 @@
-FROM golang:1.26-bookworm AS builder
+FROM golang:1.26-alpine AS server-builder
 
 ARG VERSION=latest-cgo
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
-ARG PLUGIN_VERSION=dev
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential git && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache build-base git
 
 WORKDIR /src
 
@@ -29,32 +26,27 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -X 'main.BuildDate=${BUILD_DATE}'" \
     -o /out/CLIProxyAPI ./cmd/server/
 
+FROM alpine:3.23 AS plugin-builder
+
+RUN apk add --no-cache cmake g++ make
+
 WORKDIR /plugin
 
-COPY plugin/go.mod plugin/go.sum ./
-RUN --mount=type=cache,target=/root/.cache/go-mod go mod download
+COPY plugin/CMakeLists.txt ./
+COPY plugin/src ./src
 
-COPY plugin/ ./
+RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF && \
+    cmake --build build --parallel && \
+    cp build/codex-auto-ping.so /codex-auto-ping.so
 
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/root/.cache/go-mod \
-    CGO_ENABLED=1 go build \
-    -buildvcs=false \
-    -trimpath \
-    -buildmode=c-shared \
-    -ldflags="-s -w -X main.pluginVersion=${PLUGIN_VERSION}" \
-    -o /out/codex-auto-ping.so .
+FROM alpine:3.23
 
-FROM debian:bookworm
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates tzdata && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates tzdata libstdc++
 
 RUN mkdir -p /CLIProxyAPI/plugins/linux/amd64
 
-COPY --from=builder /out/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
-COPY --from=builder /out/codex-auto-ping.so /CLIProxyAPI/plugins/linux/amd64/codex-auto-ping.so
+COPY --from=server-builder /out/CLIProxyAPI /CLIProxyAPI/CLIProxyAPI
+COPY --from=plugin-builder /codex-auto-ping.so /CLIProxyAPI/plugins/linux/amd64/codex-auto-ping.so
 COPY upstream/config.example.yaml /CLIProxyAPI/config.example.yaml
 
 WORKDIR /CLIProxyAPI

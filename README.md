@@ -7,7 +7,7 @@ The workflow runs every six hours and:
 1. resolves the source revision used by the current upstream `latest` image;
 2. checks out that exact revision from `caidaoli/CLIProxyAPI`;
 3. checks out the latest release of `KKKKeybird/cpa-codex-auto-ping`;
-4. builds both with CGO enabled against Debian/glibc; and
+4. builds the host with CGO enabled on Alpine/musl and builds the plugin as a musl C++ shared library; and
 5. publishes `ghcr.io/kkkkeybird/cliproxyapi-cgo:latest` for Linux AMD64.
 
 ## Docker Compose
